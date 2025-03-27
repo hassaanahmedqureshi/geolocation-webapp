@@ -6,39 +6,102 @@ interface MapProps {
     zoom?: number; // Initial zoom level
 }
 
-const Map: React.FC<MapProps> = ({ center = [12.116505, 42.4174757], zoom = 20 }) => {
+
+
+const Map: React.FC<MapProps> = () => {
+    // Define GeoJSON type
+    const polygonGeoJSON: GeoJSON.FeatureCollection<GeoJSON.Geometry> = {
+        type: 'FeatureCollection',
+        features: [
+            {
+                type: 'Feature',
+                geometry: {
+                    type: 'Polygon',
+                    coordinates: [[
+                        [12.1164, 42.4176],  // Top-left
+                        [12.1166, 42.4176],  // Top-right
+                        [12.1166, 42.4173],  // Bottom-right
+                        [12.1164, 42.4173],  // Bottom-left
+                        [12.1164, 42.4176]   // Closing the polygon
+                    ]]
+                },
+                properties: {}
+            }
+        ]
+    };
+
     useEffect(() => {
         const apiKey = process.env.REACT_APP_MAPTILER_API_KEY;
 
-        if (!apiKey) {
-            console.error('MapTiler API key is missing in the .env file.');
-            return;
-        }
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: `https://api.maptiler.com/maps/streets/style.json?key=${apiKey}`,
+            center: [12.116505, 42.4174757],
+            zoom: 20,
+        });
 
-        try {
-            const map = new maplibregl.Map({
-                container: 'map', // HTML element ID for the map container
-                style: `https://api.maptiler.com/maps/streets/style.json?key=${apiKey}`,
-                center: center,
-                zoom: zoom,
+        map.on('load', () => {
+            console.log('Map loaded successfully');
+
+            // Add marker on the map
+            new maplibregl.Marker()
+                .setLngLat([12.116505, 42.4174757])
+                .addTo(map);
+
+            // Define a polygon area (adjust coordinates to create the shape)
+            // const polygonGeoJSON = {
+            //     type: 'FeatureCollection',
+            //     features: [
+            //         {
+            //             type: 'Feature',
+            //             geometry: {
+            //                 type: 'Polygon',
+            //                 coordinates: [[
+            //                     [12.1164, 42.4176],  // Top-left
+            //                     [12.1166, 42.4176],  // Top-right
+            //                     [12.1166, 42.4173],  // Bottom-right
+            //                     [12.1164, 42.4173],  // Bottom-left
+            //                     [12.1164, 42.4176]   // Closing the polygon
+            //                 ]]
+            //             },
+            //             properties: {}
+            //         }
+            //     ]
+            // };
+            // Add the polygon source
+            map.addSource('marked-area', {
+                type: 'geojson',
+                data: polygonGeoJSON
             });
 
-            map.on('load', () => {
-                console.log('Map loaded successfully');
+            // Add fill layer to show the area
+            map.addLayer({
+                id: 'marked-area-fill',
+                type: 'fill',
+                source: 'marked-area',
+                layout: {},
+                paint: {
+                    'fill-color': '#ff0000', // Red fill
+                    'fill-opacity': 0.4      // Semi-transparent
+                }
             });
 
-            map.on('error', (e) => {
-                console.error('Map error:', e.error);
+            // Add an outline to the polygon
+            map.addLayer({
+                id: 'marked-area-outline',
+                type: 'line',
+                source: 'marked-area',
+                layout: {},
+                paint: {
+                    'line-color': '#ff0000',
+                    'line-width': 2
+                }
             });
+        });
 
-            // Cleanup the map instance when the component unmounts
-            return () => map.remove();
-        } catch (err) {
-            console.error('Map initialization error:', err);
-        }
-    }, [center, zoom]);
+    });
 
-    return <div id="map"  style={{ width: '80%', height: '80vh' }} />;
+    return <div id="map" style={{ width: '80%', height: '80vh' }} />;
 };
 
 export default Map;
