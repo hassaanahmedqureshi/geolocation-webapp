@@ -43,50 +43,27 @@ const Map: React.FC<MapProps> = () => {
         map.on('load', () => {
             console.log('Map loaded successfully');
 
-            // Add marker on the map
             new maplibregl.Marker()
                 .setLngLat([12.116505, 42.4174757])
                 .addTo(map);
 
-            // Define a polygon area (adjust coordinates to create the shape)
-            // const polygonGeoJSON = {
-            //     type: 'FeatureCollection',
-            //     features: [
-            //         {
-            //             type: 'Feature',
-            //             geometry: {
-            //                 type: 'Polygon',
-            //                 coordinates: [[
-            //                     [12.1164, 42.4176],  // Top-left
-            //                     [12.1166, 42.4176],  // Top-right
-            //                     [12.1166, 42.4173],  // Bottom-right
-            //                     [12.1164, 42.4173],  // Bottom-left
-            //                     [12.1164, 42.4176]   // Closing the polygon
-            //                 ]]
-            //             },
-            //             properties: {}
-            //         }
-            //     ]
-            // };
-            // Add the polygon source
             map.addSource('marked-area', {
                 type: 'geojson',
                 data: polygonGeoJSON
             });
 
-            // Add fill layer to show the area
             map.addLayer({
                 id: 'marked-area-fill',
                 type: 'fill',
                 source: 'marked-area',
                 layout: {},
                 paint: {
-                    'fill-color': '#ff0000', // Red fill
-                    'fill-opacity': 0.4      // Semi-transparent
+                    'fill-color': '#ff0000',
+                    'fill-opacity': 0.4
                 }
             });
 
-            // Add an outline to the polygon
+
             map.addLayer({
                 id: 'marked-area-outline',
                 type: 'line',
