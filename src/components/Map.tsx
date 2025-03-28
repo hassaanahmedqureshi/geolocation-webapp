@@ -7,19 +7,77 @@ interface MapProps {
     zoom?: number;
 }
 
-const Map: React.FC<MapProps> = () => {
-    useEffect(() => {
-        const apiKey = process.env.REACT_APP_MAPTILER_API_KEY;
+type Coordinate = [number, number];
+type ReformattedCoordinate = { lat: number; lng: number };
 
+const reformatCoordinates = (coordinates: Coordinate[]): ReformattedCoordinate[] =>
+    coordinates.map((coord) => ({ lat: coord[1], lng: coord[0] }));
+
+const addFilledPolygon = (map: maplibregl.Map, polygon: GeoJSON.Feature<GeoJSON.Polygon>) => {
+    const polygonId = polygon.id as string;
+
+    if (map.getLayer(`polygon-fill-${polygonId}`)) {
+        map.removeLayer(`polygon-fill-${polygonId}`);
+    }
+    if (map.getSource(`polygon-source-${polygonId}`)) {
+        map.removeSource(`polygon-source-${polygonId}`);
+    }
+
+    map.addSource(`polygon-source-${polygonId}`, { type: 'geojson', data: polygon });
+    map.addLayer({
+        id: `polygon-fill-${polygonId}`,
+        type: 'fill',
+        source: `polygon-source-${polygonId}`,
+        paint: { 'fill-color': '#ff0000', 'fill-opacity': 0.5 },
+    });
+};
+
+const createDrawButton = (startDrawing: () => void) => {
+    const drawButton = document.createElement('button');
+    drawButton.innerText = 'Start Drawing';
+    Object.assign(drawButton.style, {
+        position: 'absolute',
+        top: '10px',
+        left: '10px',
+        zIndex: '1000',
+    });
+    drawButton.onclick = startDrawing;
+    return drawButton;
+};
+
+const Map: React.FC<MapProps> = ({ center = [12.116505, 42.4174757], zoom = 20 }) => {
+    const handleSendCoordinates = async (coordinates: ReformattedCoordinate[]) => {
+        const payload = { coordinates };
+
+        fetch('http://lp01.corp.itroteam.com:7200/api/poi', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        })
+            .then((response) => {
+                if (!response.ok) throw new Error(`Error: ${response.status}`);
+                return response.json();
+            })
+            .then((data) => {
+                console.log('Response from Server:', data); // Log server response here
+                return data; // Return the response for further use
+            })
+            .catch((error) => {
+                console.error('Error sending coordinates:', error);
+                throw error; // Re-throw the error if needed
+            });
+
+    };
+
+    useEffect(() => {
         const map = new maplibregl.Map({
             container: 'map',
-            style: `https://api.maptiler.com/maps/streets/style.json?key=${apiKey}`,
-            center: [12.116505, 42.4174757],
-            zoom: 20,
+            style: `https://api.maptiler.com/maps/streets/style.json?key=${process.env.REACT_APP_MAPTILER_API_KEY}`,
+            center,
+            zoom,
         });
 
         const draw = new MapboxDraw({
-            displayControlsDefault: false,
             controls: { polygon: true, trash: true },
             styles: [
                 {
@@ -30,8 +88,8 @@ const Map: React.FC<MapProps> = () => {
                     paint: {
                         "line-color": "#D20C0C",
                         "line-width": 2,
-                        "line-dasharray": ["literal", [0.2, 2]]
-                    }
+                        "line-dasharray": ["literal", [0.2, 2]], // Ensure literal array
+                    },
                 },
                 {
                     id: "gl-draw-polygon-stroke",
@@ -41,121 +99,39 @@ const Map: React.FC<MapProps> = () => {
                     paint: {
                         "line-color": "#D20C0C",
                         "line-width": 2,
-                        "line-dasharray": ["literal", [2, 2]]
-                    }
-                }
-            ]
+                        "line-dasharray": ["literal", [2, 2]], // Ensure literal array
+                    },
+                },
+            ],
         });
 
         map.on('load', () => {
-            console.log('Map loaded successfully');
+            const drawButton = createDrawButton(() => draw.changeMode('draw_polygon'));
+            document.body.appendChild(drawButton);
 
-            new maplibregl.Marker()
-                .setLngLat([12.116505, 42.4174757])
-                .addTo(map);
-
-            map.addControl(draw as unknown as maplibregl.IControl, 'top-left');
-
-            // Add Predefined Polygon
-            const polygonGeoJSON: GeoJSON.FeatureCollection<GeoJSON.Geometry> = {
-                type: 'FeatureCollection',
-                features: [
-                    {
-                        type: 'Feature',
-                        geometry: {
-                            type: 'Polygon',
-                            coordinates: [[
-                                [12.1164, 42.4176],
-                                [12.1166, 42.4176],
-                                [12.1166, 42.4173],
-                                [12.1164, 42.4173],
-                                [12.1164, 42.4176]
-                            ]]
-                        },
-                        properties: {}
-                    }
-                ]
-            };
-
-            map.addSource('marked-area', {
-                type: 'geojson',
-                data: polygonGeoJSON
-            });
-
-            map.addLayer({
-                id: 'marked-area-fill',
-                type: 'fill',
-                source: 'marked-area',
-                layout: {},
-                paint: {
-                    'fill-color': '#ff0000',
-                    'fill-opacity': 0.4
-                }
-            });
-
-            map.addLayer({
-                id: 'marked-area-outline',
-                type: 'line',
-                source: 'marked-area',
-                layout: {},
-                paint: {
-                    'line-color': '#ff0000',
-                    'line-width': 2
-                }
-            });
+            map.addControl(draw as unknown as maplibregl.IControl);
         });
 
-        // Function to fill user-drawn polygons
-        const addFilledPolygon = (polygon: GeoJSON.Feature<GeoJSON.Polygon>) => {
-            const polygonId = polygon.id as string;
-
-            if (map.getLayer(`polygon-fill-${polygonId}`)) {
-                map.removeLayer(`polygon-fill-${polygonId}`);
-            }
-            if (map.getSource(`polygon-source-${polygonId}`)) {
-                map.removeSource(`polygon-source-${polygonId}`);
-            }
-
-            map.addSource(`polygon-source-${polygonId}`, {
-                type: 'geojson',
-                data: polygon
-            });
-
-            map.addLayer({
-                id: `polygon-fill-${polygonId}`,
-                type: 'fill',
-                source: `polygon-source-${polygonId}`,
-                paint: {
-                    'fill-color': '#ff0000',
-                    'fill-opacity': 0.5
-                }
-            });
-        };
-
-        // Event: When user completes drawing a polygon
         map.on('draw.create', (event) => {
-            console.log("Polygon drawn:", event.features[0]);
+            const polygon_object = event.features[0];
+            const coordinates: Coordinate[] = polygon_object.geometry.coordinates[0];
+            const reformattedCoordinates = reformatCoordinates(coordinates);
 
-            const polygon = event.features[0] as GeoJSON.Feature<GeoJSON.Polygon>;
-
-            document.addEventListener('keydown', (e) => {
-                if (e.key === "Enter") {
-                    addFilledPolygon(polygon);
-                }
-            }, { once: true });
+            handleSendCoordinates(reformattedCoordinates).then((data) => {
+                console.log('Coordinates sent successfully: ', data);
+            })
+                .catch((error) => {
+                    console.error('Error while sending coordinates:', error);
+                });
+            ;
+            addFilledPolygon(map, polygon_object as GeoJSON.Feature<GeoJSON.Polygon>);
         });
 
-        const startDrawing = () => draw.changeMode('draw_polygon');
-
-        const drawButton = document.createElement('button');
-        drawButton.innerText = "Start Drawing";
-        drawButton.style.position = "absolute";
-        drawButton.style.top = "10px";
-        drawButton.style.left = "10px";
-        drawButton.style.zIndex = "1000";
-        drawButton.onclick = startDrawing;
-        document.body.appendChild(drawButton);
-    }, []);
+        return () => {
+            map.remove();
+            document.querySelectorAll('button').forEach((btn) => btn.remove());
+        };
+    }, [center, zoom]);
 
     return <div id="map" style={{ width: '80%', height: '80vh' }} />;
 };
