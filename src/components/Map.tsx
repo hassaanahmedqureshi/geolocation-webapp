@@ -15,11 +15,11 @@ const reformatCoordinates = (coordinates: Coordinate[]): ReformattedCoordinate[]
 
 const addFilledPolygon = (map: maplibregl.Map, polygon: GeoJSON.Feature<GeoJSON.Polygon>) => {
     const polygonId = polygon.properties?.id as string;
-
-    if (!polygonId) {
-        console.error('Polygon is missing a unique id:', polygon);
-        return;
-    }
+    //
+    // if (!polygonId) {
+    //     console.error('Polygon is missing a unique id:', polygon);
+    //     return;
+    // }
 
     // Use unique IDs for sources and layers based on the polygon's id
     const sourceId = `polygon-source-${polygonId}`;
